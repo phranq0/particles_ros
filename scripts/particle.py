@@ -27,17 +27,23 @@ def create_gaussian_particles(mean, std, N):
 # TEST
 #print(create_gaussian_particles((0.0,0.0,0.0),(0.3,0.3,0.1),10))
 
-# Predict Step
+# ---------------------------- Predict Step
 # Steps the motion model, which is the state transition of each particle
 # with noise
-# Input is in the shape (w,v)
-def predict(particles, u, std, dt=1.):
+# Nonlinear model - Input is in the shape (w,v)
+def predict_nonlinear_planar(particles, u, std, dt=1.):
     N = len(particles)
     particles[:,2] += u[0] + (randn(N)*std[0])
     particles[:,2] %= 2*np.pi                  # Always normalize angular variables
     dist = (u[1]*dt) + (randn(N)*std[1])
     particles[:,0] += np.cos(particles[:,2])*dist
     particles[:,1] += np.sin(particles[:,2])*dist
+
+# Linear model - Holonomic agent, inputs are directly velocities on the axes
+def predict_linear_planar(particles, u, std, dt=1.):
+    N = len(particles)
+    particles[:,0] += u[0]*dt + (randn(N)*std[0])
+    particles[:,1] += u[1]*dt + (randn(N)*std[1])
 
 # Update step (for now related to landmark-based model, 
 # to be decoupled for suiting more sensor models)

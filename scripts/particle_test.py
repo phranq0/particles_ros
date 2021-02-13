@@ -13,7 +13,7 @@ from filterpy.monte_carlo import systematic_resample
 
 # Basic filtering test loop
 def run_sim_pf(N, iters=30, sensor_std_err=0.1, do_plot=True, plot_particles=False,
-            xlim=(0,20), ylim=(0,20), initial_x=None):
+            xlim=(0,2), ylim=(0,2), initial_x=None):
     landmarks = np.array([[-1, 2], [5, 10], [12,14], [18,21]])
     NL = len(landmarks)      
     plt.figure()
@@ -22,7 +22,7 @@ def run_sim_pf(N, iters=30, sensor_std_err=0.1, do_plot=True, plot_particles=Fal
     # Gaussian or Uniform
     if initial_x is not None:
         particles = create_gaussian_particles(
-            mean=initial_x, std=(5, 5, np.pi/4), N=N)
+            mean=initial_x, std=(0.35, 0.4, np.pi/4), N=N)
     else:
         particles = create_uniform_particles((0,20), (0,20), (0, 6.28), N)
     # Initial normalized weights
@@ -48,7 +48,7 @@ def run_sim_pf(N, iters=30, sensor_std_err=0.1, do_plot=True, plot_particles=Fal
         zs = (norm(landmarks - robot_pos, axis=1) + (randn(NL) * sensor_std_err))
 
         # Evolve particles following the motion model
-        predict(particles, u=(0.00, 1.414), std=(.2, .05))
+        predict_nonlinear_planar(particles, u=(0.00, 1.414), std=(.2, .05))
         
         # Update weights from measurements
         update(particles, weights, z=zs, R=sensor_std_err, landmarks=landmarks)
@@ -82,5 +82,5 @@ def run_sim_pf(N, iters=30, sensor_std_err=0.1, do_plot=True, plot_particles=Fal
     plt.show()
 
 # Run simulation
-seed(6)
-run_sim_pf(N=5000,plot_particles=True,initial_x=(1,1, np.pi/4))
+seed(2)
+run_sim_pf(N=5000,plot_particles=True,initial_x=(0.6,0.6, np.pi/4))

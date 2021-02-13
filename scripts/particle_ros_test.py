@@ -11,20 +11,21 @@ import seaborn as sb
 import rospy
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped
-import particles
-from particles import distributions as dists
-from particles import state_space_models as ssm
-from particles.collectors import MomentsCollector  # In newer version is called 'Moments'
-from particles import state_space_models as ssms   # For defining motion and measurement models from state space
-from particles import distributions as dists
+from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import Pose
+from particle import *
 
 # User defined
 from mob_agent import MobAgent
 
 # Basic ROS publisher
 def particle_pub():
-    pub_sim_rob = rospy.Publisher('mobile_agent', PoseStamped, queue_size=10)
     rospy.init_node('particle_publisher',anonymous=True)
+
+    # Define publishers
+    pub_sim_rob = rospy.Publisher('mobile_agent', PoseStamped, queue_size=10)
+    pub_particles = rospy.Publisher('particles', PoseArray, queue_size=20)
+    pub_estimate = rospy.Publisher('state_estimate', PoseStamped, queue_size=10)
 
     rate = rospy.Rate(100)     # 100 Hz rate
 
@@ -33,6 +34,21 @@ def particle_pub():
     vx = 0.1
     vy = 0.1
 
+    num_particles = 1000
+
+    # Create particle filter
+    initial_x=(0.6,0.6, np.pi/4)
+    particles = create_gaussian_particles(mean=initial_x, std=(0.35, 0.4, np.pi/4), N=num_particles)
+    weights = np.ones(num_particles) / num_particles
+    #print(particles)
+    #fig, ax = plt.subplots()
+    #ax.scatter(particles[:,0],particles[:,1],color='green',s=3)
+    #ax.grid()
+    #plt.show()
+    #exit(0)
+
+    # Estimate
+    xs = []
 
     # For plots 
     ground_truth_lst = []
@@ -42,8 +58,10 @@ def particle_pub():
         # ----------------------- Agent Simulation
         # Evolve simulated agent
         mob_rob.step(vx,vy)
+
         # Get simulated noisy measurement
         [x_meas, y_meas] = mob_rob.state_meas()
+
         # Fill the message
         p_real = PoseStamped()
         p_real.header.seq = 1
@@ -58,9 +76,49 @@ def particle_pub():
         p_real.pose.orientation.w = 1                      
         pub_sim_rob.publish(p_real)
 
-        # ------------------------ State Estimation
-
+        # ------------------------ Prediction step
+        predict_linear_planar(particles, u=(vx, vy), std=(.005,.005), dt=mob_rob.dt)
+        # Message
+        p_particles = PoseArray()
+        p_particles.header.seq = 1
+        p_particles.header.frame_id = "map"
+        i = 0
+        for p in particles:
+            p_tmp = Pose()
+            p_tmp.position.x = p[0]
+            p_tmp.position.y = p[1]
+            p_tmp.position.z = 0
+            p_tmp.orientation.x = 0
+            p_tmp.orientation.y = 0
+            p_tmp.orientation.z = 0
+            p_tmp.orientation.w = 1
+            
+            p_particles.poses.append(p_tmp)
+        pub_particles.publish(p_particles)
         # -----------------------------------------
+
+        # ------------------------ Correction step
+        # TODO
+        #-----------------------------------------
+
+        # --------------------------- Estimation
+        mu, var = estimate(particles, weights)
+        # Message
+        p_estimate = PoseStamped()
+        p_estimate.header.seq = 1
+        p_estimate.header.frame_id = "map"
+        p_estimate.header.stamp = rospy.Time.now()
+        p_estimate.pose.position.x = mu[0]
+        p_estimate.pose.position.y = mu[1]
+        p_estimate.pose.position.z = 0
+        p_estimate.pose.orientation.x = 0
+        p_estimate.pose.orientation.y = 0
+        p_estimate.pose.orientation.z = 0
+        p_estimate.pose.orientation.w = 1
+
+        pub_estimate.publish(p_estimate)
+        xs.append(mu)
+        # --------------------------------------
 
         # Saving for plots
         ground_truth_lst.append([mob_rob.x,mob_rob.y])
@@ -74,10 +132,11 @@ def particle_pub():
     gt_plot = np.array(ground_truth_lst)
     meas_plot = np.array(meas_lst)
     fig, ax = plt.subplots()
-    ax.plot(gt_plot[:,0],gt_plot[:,1],color='blue',linewidth=2)
-    ax.scatter(meas_plot[:,0],meas_plot[:,1],color='green',s=3)
+    ax.plot(gt_plot[:,0],gt_plot[:,1],color='k',linewidth=2)
+    ax.scatter(meas_plot[:,0],meas_plot[:,1],color='b',s=3)
     ax.set(xlabel='x(m)', ylabel='y(m)',
        title='Ground truth robot pose')
+    ax.legend(['Ground truth','Measurements'])
     ax.grid()
     plt.show()
 
