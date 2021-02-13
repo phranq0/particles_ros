@@ -24,7 +24,7 @@ class MobAgent:
     # Simulate direct state noisy measurements 
     def state_meas(self):
         mu = 0
-        sigma = 0.1
+        sigma = 0.05
         x_m = self.x + np.random.normal(mu,sigma)
         y_m = self.y + np.random.normal(mu,sigma)
         #print("Measurements: %f and %f" % (x_m,y_m))

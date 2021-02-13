@@ -51,7 +51,7 @@ def run_sim_pf(N, iters=30, sensor_std_err=0.1, do_plot=True, plot_particles=Fal
         predict_nonlinear_planar(particles, u=(0.00, 1.414), std=(.2, .05))
         
         # Update weights from measurements
-        update(particles, weights, z=zs, R=sensor_std_err, landmarks=landmarks)
+        update_landmarks(particles, weights, z=zs, R=sensor_std_err, landmarks=landmarks)
         
         # Resample triggering
         if neff(weights) < N/2:

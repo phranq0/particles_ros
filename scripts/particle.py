@@ -45,13 +45,20 @@ def predict_linear_planar(particles, u, std, dt=1.):
     particles[:,0] += u[0]*dt + (randn(N)*std[0])
     particles[:,1] += u[1]*dt + (randn(N)*std[1])
 
-# Update step (for now related to landmark-based model, 
-# to be decoupled for suiting more sensor models)
-def update(particles,weights,z,R,landmarks):
+# Update step - landmark-based model 
+def update_landmarks(particles,weights,z,R,landmarks):
     # For each landmark
     for i, landmark in enumerate(landmarks):
         distance = np.linalg.norm(particles[:,0:2] - landmark, axis=1)  # P(z|x)
         weights *= scipy.stats.norm(distance,R).pdf(z[i])               # P(z|x)*P(x)
+
+    weights += 1.e-300  
+    weights /= sum(weights)     # [P(z|x)*P(x)]/P(z)
+
+# Update step - gps model (direct state measurement)
+def update_fullstate(particles,weights,z,R):
+    distance = np.linalg.norm(particles[:,0:2],axis=1)                                     # P(z|x)
+    weights *= scipy.stats.norm(distance,R).pdf(z)                  # P(z|x)*P(x)
 
     weights += 1.e-300  
     weights /= sum(weights)     # [P(z|x)*P(x)]/P(z)

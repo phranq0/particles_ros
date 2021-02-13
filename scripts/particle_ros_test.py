@@ -13,10 +13,11 @@ from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import PoseArray
 from geometry_msgs.msg import Pose
-from particle import *
+from filterpy.monte_carlo import systematic_resample
 
 # User defined
 from mob_agent import MobAgent
+from particle import *
 
 # Basic ROS publisher
 def particle_pub():
@@ -26,6 +27,9 @@ def particle_pub():
     pub_sim_rob = rospy.Publisher('mobile_agent', PoseStamped, queue_size=10)
     pub_particles = rospy.Publisher('particles', PoseArray, queue_size=20)
     pub_estimate = rospy.Publisher('state_estimate', PoseStamped, queue_size=10)
+
+    # Define subscribers
+    # TODO
 
     rate = rospy.Rate(100)     # 100 Hz rate
 
@@ -53,6 +57,7 @@ def particle_pub():
     # For plots 
     ground_truth_lst = []
     meas_lst = []
+    estimate_lst = []
 
     while not rospy.is_shutdown():
         # ----------------------- Agent Simulation
@@ -98,7 +103,13 @@ def particle_pub():
         # -----------------------------------------
 
         # ------------------------ Correction step
-        # TODO
+        sensor_std_err = 0.05
+        z = np.linalg.norm(np.array([x_meas,y_meas]))
+        update_fullstate(particles, weights, z=z, R=sensor_std_err)
+        # Resample triggering
+        if neff(weights) < num_particles/2:
+            indexes = systematic_resample(weights)
+            resample_from_index(particles, weights, indexes)
         #-----------------------------------------
 
         # --------------------------- Estimation
@@ -118,6 +129,7 @@ def particle_pub():
 
         pub_estimate.publish(p_estimate)
         xs.append(mu)
+        estimate_lst.append(mu)
         # --------------------------------------
 
         # Saving for plots
@@ -131,9 +143,11 @@ def particle_pub():
     # Ground truth simulated robot and noisy measurements
     gt_plot = np.array(ground_truth_lst)
     meas_plot = np.array(meas_lst)
+    estimate_plot = np.array(estimate_lst)
     fig, ax = plt.subplots()
     ax.plot(gt_plot[:,0],gt_plot[:,1],color='k',linewidth=2)
     ax.scatter(meas_plot[:,0],meas_plot[:,1],color='b',s=3)
+    ax.plot(estimate_plot[:,0],estimate_plot[:,1],color='r',linewidth=2)
     ax.set(xlabel='x(m)', ylabel='y(m)',
        title='Ground truth robot pose')
     ax.legend(['Ground truth','Measurements'])
