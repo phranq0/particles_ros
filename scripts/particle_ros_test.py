@@ -18,17 +18,18 @@ from filterpy.monte_carlo import systematic_resample
 # User defined
 from mob_agent import MobAgent
 from particle import *
+from ros_utils import *
 
 # Basic ROS publisher
 def particle_pub():
     rospy.init_node('particle_publisher',anonymous=True)
 
-    # Define publishers
+    # Publishers
     pub_sim_rob = rospy.Publisher('mobile_agent', PoseStamped, queue_size=10)
     pub_particles = rospy.Publisher('particles', PoseArray, queue_size=20)
     pub_estimate = rospy.Publisher('state_estimate', PoseStamped, queue_size=10)
 
-    # Define subscribers
+    # Subscribers
     # TODO
 
     rate = rospy.Rate(100)     # 100 Hz rate
@@ -67,38 +68,15 @@ def particle_pub():
         # Get simulated noisy measurement
         [x_meas, y_meas] = mob_rob.state_meas()
 
-        # Fill the message
-        p_real = PoseStamped()
-        p_real.header.seq = 1
-        p_real.header.frame_id = "map"
-        p_real.header.stamp = rospy.Time.now()
-        p_real.pose.position.x = mob_rob.x
-        p_real.pose.position.y = mob_rob.y
-        p_real.pose.position.z = 0
-        p_real.pose.orientation.x = 0
-        p_real.pose.orientation.y = 0
-        p_real.pose.orientation.z = 0
-        p_real.pose.orientation.w = 1                      
+        # Ground truth message
+        p_real = build_rob_pose_msg(mob_rob)          
         pub_sim_rob.publish(p_real)
 
         # ------------------------ Prediction step
         predict_linear_planar(particles, u=(vx, vy), std=(.005,.005), dt=mob_rob.dt)
-        # Message
-        p_particles = PoseArray()
-        p_particles.header.seq = 1
-        p_particles.header.frame_id = "map"
-        i = 0
-        for p in particles:
-            p_tmp = Pose()
-            p_tmp.position.x = p[0]
-            p_tmp.position.y = p[1]
-            p_tmp.position.z = 0
-            p_tmp.orientation.x = 0
-            p_tmp.orientation.y = 0
-            p_tmp.orientation.z = 0
-            p_tmp.orientation.w = 1
-            
-            p_particles.poses.append(p_tmp)
+
+        # Particles message
+        p_particles = build_particles_msg(particles)
         pub_particles.publish(p_particles)
         # -----------------------------------------
 
@@ -114,29 +92,20 @@ def particle_pub():
 
         # --------------------------- Estimation
         mu, var = estimate(particles, weights)
-        # Message
-        p_estimate = PoseStamped()
-        p_estimate.header.seq = 1
-        p_estimate.header.frame_id = "map"
-        p_estimate.header.stamp = rospy.Time.now()
-        p_estimate.pose.position.x = mu[0]
-        p_estimate.pose.position.y = mu[1]
-        p_estimate.pose.position.z = 0
-        p_estimate.pose.orientation.x = 0
-        p_estimate.pose.orientation.y = 0
-        p_estimate.pose.orientation.z = 0
-        p_estimate.pose.orientation.w = 1
 
+        # Estimate message
+        p_estimate = build_estimate_msg(mu)
         pub_estimate.publish(p_estimate)
-        xs.append(mu)
-        estimate_lst.append(mu)
         # --------------------------------------
 
         # Saving for plots
         ground_truth_lst.append([mob_rob.x,mob_rob.y])
         meas_lst.append([x_meas,y_meas])
+        xs.append(mu)
+        estimate_lst.append(mu)
 
         rate.sleep()
+    # ----------------------------------------------------------------------
 
     print("Plotting results")
     # Post processing and plots when execution is over
